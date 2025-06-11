@@ -2,10 +2,10 @@
 <html>
 <head>
     <title>Registro exitoso</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/anuncio.css') }}">
+    <link rel="stylesheet" href="/static/css/anuncio.css">
 </head>
 <body>
-    <h1>Trabajador registrado exitosamente</h1>
-    <a href="/">Volver al inicio</a>
+    <a href="index.html" class="boton-volver">Volver</a>
+    <h1>{{ anuncio }}</h1>
 </body>
 </html>
