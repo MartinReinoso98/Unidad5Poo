@@ -1,7 +1,7 @@
 from flask import Flask, request, render_template
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
-from models import database, trabajador, registroHorario
+from models import database, trabajador, registrohorario
 
 
 app = Flask(__name__)
@@ -10,31 +10,37 @@ app = Flask(__name__)
 def inicio():
     return render_template('index.html')
         
-@app.route('/registro', methods=['GET', 'POST'])
+@app.route('/templates/formulario.html', methods=['GET', 'POST'])
 def registrar_entrada():
     if request.method == 'POST':
         legajo = request.form['legajo']
-        dni4 = request.form['dni']
-        dependencia = request.form['dependencia']
+        dni = request.form['dni_4']
 
-        if not legajo or not dni4 or not dependencia:
+        # validar campos
+        if not legajo or not dni:
             return render_template('error.html', error="Todos los campos son obligatorios")
 
-        # verifica que el trabajador exista
-        trabajador_existente = trabajador.query.filter_by(legajo_e=legajo).first() # si o si se tiene que filtrar por legajo, dni y dependencia? para asegurarme que ese legajo tenga el dni que se ingreso
+        # verificar que el trabajador exista
+        trabajador_existente = trabajador.query.filter_by(legajo=legajo, dni=dni).first()
         if not trabajador_existente:
             return render_template('error.html', error="Trabajador no registrado")
 
-        # verifica si ya tiene una entrada para hoy (no se como hacerlo)
-        pass
-    
-    
+        # verificar si ya tiene una entrada hoy
+        ultima_entrada = registrohorario.query.filter_by(legajo=legajo).order_by(registrohorario.fecha_hora.desc()).first()
+        fecha_hoy = datetime.now().date()
 
-        # registra una entrada
-        nueva_entrada = registroHorario(legajo_e=legajo, fecha_hora=datetime.now())
+        if ultima_entrada and ultima_entrada.fecha_hora.date() == fecha_hoy:
+            return render_template('error.html', error="Ya se registró una entrada el día de hoy")
+
+        # registrar la nueva entrada
+        nueva_entrada = registrohorario(legajo=legajo, fecha_hora=datetime.now())
         database.session.add(nueva_entrada)
         database.session.commit()
-        return render_template('anuncio.html')
+
+        return render_template('anuncio.html', anuncio="Nueva entrada registrada")
+
+    # GET - mostrar formulario
+    return render_template('formulario.html')
 
 
 if __name__ == '__main__':
