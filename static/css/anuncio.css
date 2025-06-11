@@ -7,3 +7,21 @@ body {
   height: 100vh;
   margin: 0;
 }
+.boton-volver {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 12px;
+  background-color: #3498db;
+  color: white;
+  font-size: 16px;
+  text-decoration: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  z-index: 999;
+  transition: background-color 0.3s ease;
+}
+.boton-volver:hover {
+  background-color: #2980b9;
+}
