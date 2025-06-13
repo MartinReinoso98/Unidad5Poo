@@ -2,6 +2,7 @@ from flask import Flask, request, render_template
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from models import database, trabajador, registrohorario
+from flask_sqlalchemy import SQLAlchemy
 
 
 app = Flask(__name__)
