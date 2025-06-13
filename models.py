@@ -17,9 +17,9 @@ class trabajador(database.Model):
 class registrohorario(database.Model):
     __tablename__ = 'registrohorario'
     id = database.Column(database.Integer, primary_key=True)
-    fecha = database.Column(database.DateTime, nullable=False)
-    horaentrada = database.Column(database.DateTime, nullable=False)
-    horasalida = database.Column(database.DateTime, nullable=False)
+    fecha = database.Column(Date, nullable=False)
+    horaentrada = database.Column(Time, nullable=False)
+    horasalida = database.Column(Time, nullable=False)
     dependencia = database.Column(database.String(3), nullable=False)
     idtrabajador = database.Column(database.Integer, database.ForeignKey('trabajador.id'))
     
