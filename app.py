@@ -1,130 +1,104 @@
 from flask import Flask, request, render_template
-from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from models import database, trabajador, registrohorario
-from flask_sqlalchemy import SQLAlchemy
-
 
 app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///datos.sqlite3'
+database.init_app(app)
 
 @app.route('/')
 def inicio():
     return render_template('index.html')
 
-
-#FUNCIONALIDAD 1        
-@app.route('/templates/formulario.html', methods=['GET', 'POST'])
-def verificar_entrada():
+    # <!--   FUNCIONALIDAD 1   -->
+@app.route('/registrar-entrada', methods=['GET', 'POST'])
+def registrar_entrada():
     if request.method == 'POST':
         legajo = request.form.get('legajo')
         dni = str(request.form.get('dni_4'))
-
-        # Validar campos
-        if not legajo or not dni:
+        dependencia = request.form.get('dependencia')
+        
+        # <!-- verifica los campos -->
+        if not all([legajo, dni, dependencia]):
             return render_template('error.html', error="Todos los campos son obligatorios")
 
-        # Verificar que el trabajador exista
-        trabajador_existente = trabajador.query.filter(
-            trabajador.legajo == legajo,
-            trabajador.dni.like(f"%{dni}")
-        ).first()
-        print("trabajador")
-        print(trabajador_existente)
-        if trabajador_existente:
-            #verificar
-            fecha_actual = datetime.today().date()
-            print("trabajdor:",trabajador_existente.id)
-            registro_existente = registrohorario.query.filter_by(
-                idtrabajador=trabajador_existente.id,
-                fecha=fecha_actual
-            ).first()
-            print(f"hay un registro:{registro_existente}")
-
-            if registro_existente:
-                return render_template('error.html', error="Ya se registró una entrada para hoy")
-            else:
-                # Crear registro de horario asociado al trabajador
-                hora_actual = datetime.now().time()
-                fecha_actual = datetime.today().date()
-
-                nueva_entrada = registrohorario(
-                    fecha=fecha_actual,
-                    horaentrada=hora_actual,
-                    horasalida=None,
-                    dependencia="DO1",
-                    idtrabajador=trabajador_existente.id
-                )
-                database.session.add(nueva_entrada)
-                database.session.commit()
-                return render_template('anuncio.html', anuncio="Nueva entrada registrada")
-
-        else:
-            return render_template('error.html', error="Trabajador no registrado en la base de datos")
-
-            #GET - mostrar formulario
-    return render_template('formulario.html')
-
-
-#FUNCIONALIDAD 2   
-@app.route('/templates/formulario.html', methods=['GET', 'POST'])
-def verificar_salida():
-    if request.method == 'POST':
-        legajo = request.form.get('legajo')
-        dni = str(request.form.get('dni_4'))
-
-        # Validar campos
-        if not legajo or not dni:
-            return render_template('error.html', error="Todos los campos son obligatorios")
-
-        # Verificar que el trabajador exista
+        # <!-- peticion a la bd -->
         trabajador_existente = trabajador.query.filter(
             trabajador.legajo == legajo,
             trabajador.dni.like(f"%{dni}")
         ).first()
 
-        print("trabajador")
-        print(trabajador_existente)
-        if trabajador_existente:   #si trabajador es distinto de None
-            
-            fecha_actual = datetime.today().date()  #guarda la fehca de hoy 
-            print("trabajdor:",trabajador_existente.id)  #Imprime en consola el ID del trabajador que se encontró previamente en la base de datos. Verifica que trabajador_existente contiene un objeto válido
-            registro_existente = registrohorario.query.filter_by(  #Busca en la tabla registrohorario registros que cumplan las dos condiciones
-                idtrabajador=trabajador_existente.id,
-                fecha=fecha_actual
-            ).first() # La funcion first() Retorna el primer registro que cumpla las condiciones o None si no existe
-            print(f"hay un registro:{registro_existente}")
+        if not trabajador_existente:
+            return render_template('error.html', error="Trabajador no registrado")
 
-            if registro_existente: # si ya hay un registro de estrada para el trabajador en la fecha actual 
-                 # Crear registro de horario asociado al trabajador
-                hora_actual = datetime.now().time()
+        # <!-- verifica si hay una entrada ya registrada -->
+        fecha_actual = datetime.today().date()
+        registro = registrohorario.query.filter_by(
+            idtrabajador=trabajador_existente.id,
+            fecha=fecha_actual
+        ).first()
 
-                if registro_existente.horasalida == None:
-                    nueva_entrada = registrohorario(
-                        fecha = fecha_actual,
-                        horaentrada = registro_existente.horaentrada, #No se debe modificar la hora de entrada
-                        horasalida = hora_actual,
-                        dependencia = "DO1", #modifcar debe acceder a los datos de la dependencia
-                        idtrabajador = trabajador_existente.id
-                    )
-                    database.session.add(nueva_entrada)
-                    database.session.commit()
-                    return render_template('anuncio.html', anuncio="Horario de Salida registrada")
-                else:
-                    return render_template('error.html', error="Ya se registró una salida para hoy")
-                
-            else:
-               return render_template('error.html', error="Aun no se ha registrado una entrada para hoy")
+        if registro:
+            return render_template('error.html', error="Ya registró su entrada hoy")
 
-        else:
-            return render_template('error.html', error="Trabajador no registrado en la base de datos")
+        # <!-- agrega a la bd una entrada -->
+        nueva_entrada = registrohorario(
+            fecha=fecha_actual,
+            horaentrada=datetime.now().time(),
+            horasalida=None,
+            dependencia=dependencia,
+            idtrabajador=trabajador_existente.id
+        )
+        database.session.add(nueva_entrada)
+        database.session.commit()
+        return render_template('anuncio.html', anuncio="Entrada registrada correctamente")
+    
+    return render_template('formulario.html', tipo='entrada')
 
-            #GET - mostrar formulario
-    return render_template('formulario.html')
+    # <!--   FUNCIONALIDAD 2   -->
+@app.route('/registrar-salida', methods=['GET', 'POST'])
+def registrar_salida():
+    if request.method == 'POST':
+        legajo = request.form.get('legajo')
+        dni = str(request.form.get('dni_4'))
+        dependencia = request.form.get('dependencia')
+        
+        # <!-- verifica los campos -->
+        if not all([legajo, dni, dependencia]):
+            return render_template('error.html', error="Todos los campos son obligatorios")
 
+        # <!-- peticion a la bd -->
+        trabajador_existente = trabajador.query.filter(
+            trabajador.legajo == legajo,
+            trabajador.dni.like(f"%{dni}")
+        ).first()
+
+        if not trabajador_existente:
+            return render_template('error.html', error="Trabajador no registrado")
+
+        # <!-- verifica si hay una salida ya registrada -->
+        fecha_actual = datetime.today().date()
+        registro = registrohorario.query.filter_by(
+            idtrabajador=trabajador_existente.id,
+            fecha=fecha_actual
+        ).first()
+
+        if not registro:
+            return render_template('error.html', error="No hay entrada registrada para hoy")
+        
+        if registro.horasalida:
+            return render_template('error.html', error="Ya registró su salida hoy")
+
+        # <!-- agrega a la bd una salida (no hace falta el add porque ya esta en la bd) -->
+        registro.horasalida = datetime.now().time()
+        database.session.commit()
+        return render_template('anuncio.html', anuncio="Salida registrada correctamente")
+    
+    return render_template('formulario.html', tipo='salida')
 
 '''
 
-#FUNCIONALIDAD 3
+    # <!--   FUNCIONALIDAD 3   -->
 @app.route('/templates/consulta.html', methods=['GET'])
 def consultarRegistroHorario(): 
      
@@ -163,6 +137,4 @@ def consultarRegistroHorario():
 if __name__ == '__main__':
     with app.app_context():
         database.create_all()
-    app.run(debug = True)
-        
-    
+    app.run(debug=True)
