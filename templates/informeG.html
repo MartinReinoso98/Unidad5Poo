@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Informe General</title>
+    <link rel="stylesheet" href="/static/css/informeG.css">
+</head>
+<body>
+    <div class="resultados">
+        <a href="/informe/general" class="boton-volver">Nuevo Informe</a>
+        <h1>Informe General</h1>
+        <p>Periodo: {{ fecha_inicio }} al {{ fecha_fin }}</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Apellido</th>
+                    <th>Nombre</th>
+                    <th>Fecha</th>
+                    <th>Entrada</th>
+                    <th>Salida</th>
+                    <th>Horas Trabajadas</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for registro in registros %}
+                <tr>
+                    <td>{{ registro.apellido }}</td>
+                    <td>{{ registro.nombre }}</td>
+                    <td>{{ registro.fecha }}</td>
+                    <td>{{ registro.entrada }}</td>
+                    <td>{{ registro.salida }}</td>
+                    <td>{{ registro.horas_trabajadas }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7">No hay registros para los filtros seleccionados</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

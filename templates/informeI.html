@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Informe Personal</title>
+    <link rel="stylesheet" href="/static/css/informeindi.css">
+</head>
+<body>
+
+    <h2>Informe Personal del Trabajador</h2>
+
+    <p><strong>Trabajador:</strong> {{ trabajador.apellido }}, {{ trabajador.nombre }}</p>
+    <p><strong>Horas semanales a cumplir:</strong> {{ horas_totales.split(':')[0] }} hs</p>
+    <p><strong>Periodo:</strong> {{ fecha_inicio }} al {{ fecha_fin }}</p>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Hora de Entrada</th>
+                <th>Hora de Salida</th>
+                <th>Horas Trabajadas</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in registros %}
+            <tr>
+                <td>{{ r.fecha }}</td>
+                <td>{{ r.entrada }}</td>
+                <td>{{ r.salida }}</td>
+                <td>{{ r.horas_trabajadas }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="3"><strong>Total de Horas Trabajadas</strong></td>
+                <td><strong>{{ horas_totales.split(':')[0] }} hs</strong></td>
+            </tr>
+        </tfoot>
+    </table>
+
+</body>
+</html>
+

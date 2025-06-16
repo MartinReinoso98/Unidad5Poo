@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Resultados de Consulta</title>
+    <link rel="stylesheet" href="/static/css/consulta.css">
+</head>
+<body>
+    <div class="resultados">
+        <a href="/consultar_registros" class="boton-volver">Nueva Consulta</a>
+        <h1>Registros de {{ trabajador.nombre if trabajador.nombre else trabajador.legajo }}</h1>
+        <p>Periodo: {{ fecha_inicio.strftime('%d/%m/%Y') }} al {{ fecha_fin.strftime('%d/%m/%Y') }}</p>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Hora Entrada</th>
+                    <th>Hora Salida</th>
+                    <th>Dependencia</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for registro in registros %}
+                <tr>
+                    <td>{{ registro.fecha.strftime('%d/%m/%Y') }}</td>
+                    <td>{{ registro.horaentrada.strftime('%H:%M') if registro.horaentrada else 'No registrada' }}</td>
+                    <td>{{ registro.horasalida.strftime('%H:%M') if registro.horasalida else 'No registrada' }}</td>
+                    <td>{{ registro.dependencia }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4">No hay registros para este periodo</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
