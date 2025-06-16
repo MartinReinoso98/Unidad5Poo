@@ -1,5 +1,5 @@
 from flask import Flask, request, render_template
-from datetime import datetime
+from datetime import datetime, date
 from models import database, trabajador, registrohorario
 
 app = Flask(__name__)
@@ -22,7 +22,7 @@ def registrar_entrada():
         if not all([legajo, dni, dependencia]):
             return render_template('error.html', error="Todos los campos son obligatorios")
 
-        # <!-- peticion a la bd -->
+        # <!-- consulta a la bd -->
         trabajador_existente = trabajador.query.filter(
             trabajador.legajo == legajo,
             trabajador.dni.like(f"%{dni}")
@@ -41,7 +41,7 @@ def registrar_entrada():
         if registro:
             return render_template('error.html', error="Ya registró su entrada hoy")
 
-        # <!-- agrega a la bd una entrada -->
+        # <!-- guarda la nueva entrada -->
         nueva_entrada = registrohorario(
             fecha=fecha_actual,
             horaentrada=datetime.now().time(),
@@ -49,6 +49,7 @@ def registrar_entrada():
             dependencia=dependencia,
             idtrabajador=trabajador_existente.id
         )
+        # <!-- agrega a la bd -->
         database.session.add(nueva_entrada)
         database.session.commit()
         return render_template('anuncio.html', anuncio="Entrada registrada correctamente")
@@ -96,43 +97,215 @@ def registrar_salida():
     
     return render_template('formulario.html', tipo='salida')
 
-'''
 
-    # <!--   FUNCIONALIDAD 3   -->
-@app.route('/templates/consulta.html', methods=['GET'])
-def consultarRegistroHorario(): 
-     
+# <!--   FUNCIONALIDAD 3   -->
+@app.route('/consultar_registros', methods=['GET', 'POST'])
+def consultar_registros():
     if request.method == 'POST':
         legajo = request.form.get('legajo')
-        dni = request.form.get('dni_4')
-        # Verificar que el trabajador exista
-        trabajador_existente = trabajador.query.filter_by(legajo=legajo, dni=dni).first()
+        dni = str(request.form.get('dni_4'))
+        fecha_inicio = request.form.get('fecha_inicio')
+        fecha_fin = request.form.get('fecha_fin')
+        
+        # <!-- verifica los campos -->
+        if not all([legajo, dni, fecha_inicio, fecha_fin]):
+            return render_template('error.html', error="Todos los campos son obligatorios")
+        
+        try:
+            fecha_inicio = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+            fecha_fin = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
+        except ValueError:
+            return render_template('error.html', error="Formato de fecha incorrecto (Usar Año-Mes-Día)")
+
+        # <!-- consulta a la bd -->
+        trabajador_existente = trabajador.query.filter(
+            trabajador.legajo == legajo,
+            trabajador.dni.like(f"%{dni}")
+        ).first()
 
         if not trabajador_existente:
-            fecha_str = request.form.get('fecha')
+            return render_template('error.html', error="Trabajador no registrado")
+
+        # <!-- consulta a la bd y ordena -->
+        registros = registrohorario.query.filter(
+            registrohorario.idtrabajador == trabajador_existente.id,
+            registrohorario.fecha >= fecha_inicio,
+            registrohorario.fecha <= fecha_fin
+        ).order_by(registrohorario.fecha).all()
+        
+        # <!-- muestra html con los resultados -->
+        return render_template('resultado_consulta.html', 
+                            registros=registros,
+                            trabajador=trabajador_existente,
+                            fecha_inicio=fecha_inicio,
+                            fecha_fin=fecha_fin)
     
-            if not fecha_str:
-                return render_template('error.html', error="Fecha requerida")
-            
-            dias = dias_desde_fecha(fecha_str)
-            
-            if dias is None:
-                return render_template('error.html', error="Formato de fecha inválido. Use DD/MM/AAAA")
-            
-            else: 
-                for i in range(len(dias)):
-                    horaE = registrohorario[i].query.filter_by(horaentrada = request.form.get('horaentrada')).all()
-                    horas = registrohorario[i].query.filter_by(horasalida = request.form.get('horasalida')).all()
-                    if horaE != None and horas != None:
-                        trabajado =  horas - horaE
-                        print(dia, horas trabajadas)
-
-                   
-            
-            return render_template('resultado.html', dias=dias)
+    return render_template('formulario.html', modo='consulta')
 
 
-'''
+# <!--   FUNCIONALIDAD 4   --> 
+@app.route('/informe/general', methods=['GET', 'POST'])
+def informe_general():
+    if request.method == 'POST':
+        paso = request.form.get('paso', '1').strip()
+        # <!-- paso 1 -->
+        if paso == '1':
+            legajo = request.form.get('legajo')
+            dni_4 = request.form.get('dni_4')
+            
+            # <!-- verifica los campos -->
+            if not legajo or not dni_4:
+                return render_template('error.html', error="Todos los campos son obligatorios")
+            
+            # <!-- consulta a la bd -->
+            admin = trabajador.query.filter_by(
+                legajo=legajo,
+                funcion='AD'
+            ).first()
+            
+            if not admin:
+                return render_template('error.html', error="Credencial de administrativo inválida")
+            
+            return render_template('formulario.html', paso=2, legajo=legajo, dni_4=dni_4)
+        
+        # <!-- paso 2 -->
+        elif paso == '2':
+            legajo = request.form.get('legajo')
+            dni_4 = request.form.get('dni_4')
+            fecha_inicio = request.form.get('fecha_inicio')
+            fecha_fin = request.form.get('fecha_fin')
+            funcion = request.form.get('funcion', 'todas')
+            dependencia = request.form.get('dependencia', 'todas')
+            
+            if not fecha_inicio or not fecha_fin:
+                return render_template('error.html', error="Debe ingresar ambas fechas")
+            
+            registros = registrohorario.query.filter(
+                registrohorario.fecha.between(fecha_inicio, fecha_fin)
+            ).all()
+            
+            # <!-- recorre los registros traidos de la query -->
+            resultados = []
+            for registro in registros:
+                trabajador_asociado = trabajador.query.get(registro.idtrabajador)
+
+                horasTrabajadas = "vacio"
+                if registro.horaentrada and registro.horasalida:
+                    entrada_dt = datetime.combine(date.today(), registro.horaentrada)
+                    salida_dt = datetime.combine(date.today(), registro.horasalida)
+                    horasTrabajadas = str(salida_dt - entrada_dt) # <!-- calculo de horas -->
+
+                # <!-- diccionario, agrega a la lista resultados -->
+                resultados.append({
+                    'apellido': trabajador_asociado.apellido,
+                    'nombre': trabajador_asociado.nombre,
+                    'fecha': registro.fecha.strftime('%Y-%m-%d'),
+                    'entrada': registro.horaentrada.strftime('%H:%M'),
+                    'salida': registro.horasalida.strftime('%H:%M'),
+                    'horas_trabajadas': horasTrabajadas
+                })
+
+            # ordenar por apellido
+            resultados.sort(key=lambda x: x['apellido']) # como es un dict no basta con __lt__ y sort, con la key se puede ordenar por el campo apellido
+            
+            # <!-- muestra html con los resultados -->
+            return render_template('informeG.html',
+                                   registros=resultados,
+                                   fecha_inicio=fecha_inicio,
+                                   fecha_fin=fecha_fin,
+                                   funcion=funcion,
+                                   dependencia=dependencia)
+    
+    return render_template('formulario.html', paso=1)
+
+# <!--   FUNCIONALIDAD 5   --> 
+@app.route('/informe/individual', methods=['GET', 'POST'])
+def informe_individual():
+    if request.method == 'POST':
+        paso = request.form.get('paso', '1').strip()
+        # <!-- paso 1 -->
+        if paso == '1':
+            legajo = request.form.get('legajo')
+            dni_4 = request.form.get('dni_4')
+            # <!-- verifica los campos -->
+            if not legajo or not dni_4:
+                return render_template('error.html', error="Todos los campos son obligatorios")
+            
+            # <!-- consulta a la bd si es administrativo-->
+            admin = trabajador.query.filter_by(
+                legajo=legajo,
+                funcion='AD'
+            ).first()
+            if not admin:
+                return render_template('error.html', error="Credencial de administrativo inválida")
+
+            return render_template('formulario.html', paso=2, legajo=legajo, dni_4=dni_4)
+        
+        # <!-- paso 2 -->
+        elif paso == '2':
+            fecha_inicio = request.form.get('fecha_inicio')
+            fecha_fin = request.form.get('fecha_fin')
+            dni_4 = request.form.get('dni_4')
+            # <!-- valida campos -->
+            if not fecha_inicio or not fecha_fin:
+                return render_template('error.html', error="Debe ingresar ambas fechas")
+            
+            # <!-- consulta a la bd -->
+            trabajador_existente = trabajador.query.filter(
+                trabajador.dni.like(f"%{dni_4}")
+            ).first()
+
+        if not trabajador_existente:
+            return render_template('error.html', error="Trabajador no encontrado")
+        
+        # <!-- obtiene registros del trabajador en el rango de fechas de la bd -->     
+        registros = registrohorario.query.filter(
+            registrohorario.idtrabajador == trabajador_existente.id,
+            registrohorario.fecha >= fecha_inicio,
+            registrohorario.fecha <= fecha_fin
+        ).order_by(registrohorario.fecha).all()
+        
+        resultados = []
+        total_horas = 0  # <!-- acumulador -->
+        
+        # <!-- recorre los registros traidos de la query -->
+        for r in registros:
+            horas_trabajadas = "vacio"
+            if r.horaentrada and r.horasalida:
+                entrada_dt = datetime.combine(date.today(), r.horaentrada)
+                salida_dt = datetime.combine(date.today(), r.horasalida)
+                duracion = salida_dt - entrada_dt
+
+                horas_trabajadas = str(duracion)
+                total_horas += duracion.total_seconds()
+                
+            # <!-- diccionario, agrega a la lista -->
+            resultados.append({
+                'fecha': r.fecha.strftime('%Y-%m-%d'),
+                'entrada': r.horaentrada.strftime('%H:%M'),
+                'salida': r.horasalida.strftime('%H:%M'),
+                'horas_trabajadas': horas_trabajadas
+            })
+            
+        # <!-- ordenar por fecha ascendente -->
+        resultados.sort(key=lambda x: x['fecha'])
+
+        # <!-- convertir a horas (segundos) -->
+        horas = int(total_horas // 3600)
+        minutos = int((total_horas % 3600) // 60)
+        horas_convertidas = f"{horas:02d}:{minutos:02d}"
+
+        # <!-- muestra html con los resultados -->
+        return render_template(
+            'informeI.html',
+            registros=resultados,
+            trabajador=trabajador_existente,
+            fecha_inicio=fecha_inicio,
+            fecha_fin=fecha_fin,
+            horas_totales=horas_convertidas
+        )
+
+    return render_template('formulario.html', paso=1)
 
 if __name__ == '__main__':
     with app.app_context():
